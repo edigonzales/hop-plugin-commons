@@ -47,6 +47,7 @@ for artifact in ARTIFACTS:
             names = zipfile.ZipFile(io.BytesIO(data)).namelist()
             assert names, f'Empty JAR: {url}'
             if not classifier:
+                assert "META-INF/LICENSE" in names, f"Missing license: {url}"
                 assert not any(n.startswith(('org/apache/hop/', 'org/eclipse/', 'org/geotools/')) for n in names)
         else:
             ET.fromstring(data)
