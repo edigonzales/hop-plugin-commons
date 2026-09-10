@@ -75,8 +75,14 @@ public final class ValueOrFieldDemo {
     fail.setText("Fehler beim Laden der Eingangsfelder simulieren");
     fail.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
     Label label = new Label(dialog, SWT.NONE);
-    label.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false));
+    label.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
     label.setText(editor == EditorKind.DIRECTORY ? "Ausgabeverzeichnis" : "Wert");
+    Label statusSpacer = new Label(dialog, SWT.NONE);
+    statusSpacer.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false));
+    Label status = new Label(dialog, SWT.WRAP);
+    GridData statusData = new GridData(SWT.FILL, SWT.TOP, true, false);
+    statusData.widthHint = 0;
+    status.setLayoutData(statusData);
     Label dirty = new Label(dialog, SWT.NONE);
     ValueOrFieldControl control =
         ValueOrFieldControl.builder(dialog, variables)
@@ -88,11 +94,21 @@ public final class ValueOrFieldDemo {
                     throw new HopException("Vorgelagerte Metadaten sind nicht verfügbar");
                   return new String[] {"raster_path", "output_directory", "layer_name"};
                 })
+            .onStatus(
+                message -> {
+                  status.setText(message);
+                  boolean visible = !message.isEmpty();
+                  for (Label part : new Label[] {statusSpacer, status}) {
+                    part.setVisible(visible);
+                    ((GridData) part.getLayoutData()).exclude = !visible;
+                  }
+                  dialog.layout(true, true);
+                })
             .onChange(() -> dirty.setText("Geändert — noch nicht übernommen"))
             .build();
-    control.moveAbove(dirty);
+    control.moveAbove(statusSpacer);
     dirty.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
-    control.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+    control.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
     control.setValue(saved.get(editor));
     Composite buttons = new Composite(dialog, SWT.NONE);
     buttons.setLayout(new GridLayout(2, true));

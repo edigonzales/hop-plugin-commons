@@ -73,6 +73,24 @@ import ch.so.agi.hop.commons.core.SourceMode;
 import ch.so.agi.hop.commons.core.ValueOrField;
 import ch.so.agi.hop.commons.ui.EditorKind;
 import ch.so.agi.hop.commons.ui.ValueOrFieldControl;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Label;
+
+// Gemeinsame Labelspalte, Eingabezeile und separate Statuszeile.
+parent.setLayout(new GridLayout(2, false));
+Label label = new Label(parent, SWT.NONE);
+label.setText("Rasterquelle");
+label.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
+
+// Vor build() anlegen: onStatus wird beim Aufbau einmal mit "" aufgerufen.
+Label statusSpacer = new Label(parent, SWT.NONE);
+statusSpacer.setLayoutData(new GridData());
+Label status = new Label(parent, SWT.WRAP);
+GridData statusData = new GridData(SWT.FILL, SWT.TOP, true, false);
+statusData.widthHint = 0; // Meldung umbrechen, nicht die bevorzugte Dialogbreite vergrössern.
+status.setLayoutData(statusData);
 
 ValueOrFieldControl path = ValueOrFieldControl.builder(parent, variables)
     .editor(EditorKind.FILE_OPEN)
@@ -82,16 +100,39 @@ ValueOrFieldControl path = ValueOrFieldControl.builder(parent, variables)
       var row = pipelineMeta.getPrevTransformFields(variables, transformMeta);
       return row == null ? new String[0] : row.getFieldNames();
     })
+    .onStatus(message -> {
+      status.setText(message);
+      for (Label part : new Label[] {statusSpacer, status}) {
+        part.setVisible(!message.isEmpty());
+        ((GridData) part.getLayoutData()).exclude = message.isEmpty();
+      }
+      parent.layout(true, true); // Neu anordnen, das Fenster nicht mit pack() vergrössern.
+    })
     .onChange(() -> input.setChanged())
     .build();
 
-path.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+path.moveAbove(statusSpacer); // Reihenfolge: Label, Widget, Platzhalter, Status.
+path.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 path.setValue(new ValueOrField(SourceMode.CONFIGURED,
     "${PROJECT_HOME}/data/source.tif", "raster_path"));
 ```
 
-Das Label bleibt im Dialog; bei mehrzeiligen Fehlermeldungen empfiehlt sich
-`SWT.TOP` auch für dessen Layout. Für ein Verzeichnis genügt
+Das externe Label wird zur Eingabezeile zentriert. Die separate Statuszeile liegt
+unter dem Widget und verändert weder dessen Höhe noch die Position des Labels.
+Beim Ausblenden werden Status und Platzhalter ausgeschlossen, sodass keine leere
+Zeile zurückbleibt. Lange Meldungen umbrechen bei der verfügbaren Breite. Der Dialog
+bleibt für sinnvolle Mindestgrösse und gegebenenfalls Scrollmöglichkeiten zuständig.
+
+`onStatus(Consumer<String>)` ersetzt die interne Fehleranzeige durch die Anzeige
+des Aufrufers. Der Callback erhält einmal während `build()` einen leeren String
+und danach nur bei Änderungen den übersetzten Meldungstext. `""` löscht die Meldung.
+Alle Aufrufe erfolgen synchron auf dem SWT-UI-Thread und lösen kein `onChange` aus.
+Callback-Exceptions werden weitergereicht, nicht als Feldlade- oder Browse-Fehler
+angezeigt. Der Aufrufer hält die externen Anzeigeelemente so lange wie das Widget am
+Leben. Ohne `onStatus` bleibt die bisherige interne Fehleranzeige vollständig erhalten;
+das oben gezeigte Muster ist für stabil ausgerichtete externe Labels vorgesehen.
+
+Für ein Verzeichnis genügt
 `.editor(EditorKind.DIRECTORY)`, für eine Ausgabedatei `FILE_SAVE`. Ohne Editorangabe
 wird `TEXT` verwendet. Ohne Feldanbieter sind Feldnamen weiterhin manuell eingebbar.
 

@@ -5,6 +5,8 @@ import ch.so.agi.hop.commons.core.SourceMode;
 import ch.so.agi.hop.commons.core.ValueOrField;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
 import org.apache.hop.core.variables.IVariables;
 import org.apache.hop.i18n.BaseMessages;
 import org.apache.hop.ui.core.PropsUi;
@@ -38,6 +40,7 @@ public final class ValueOrFieldControl extends Composite {
   private SourceMode mode = SourceMode.CONFIGURED;
   private boolean updating;
   private boolean fieldsLoaded;
+  private String statusMessage;
   private ValueOrField lastValue = new ValueOrField(SourceMode.CONFIGURED, "", "");
 
   private ValueOrFieldControl(Builder builder) {
@@ -50,26 +53,29 @@ public final class ValueOrFieldControl extends Composite {
     source = new Combo(this, SWT.READ_ONLY);
     source.setItems(message("Configured"), message("Field"));
     source.select(0);
+    source.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
     editors = new Composite(this, SWT.NONE);
     editors.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
     stack = new StackLayout();
     editors.setLayout(stack);
     configuredPage = page(editors);
     configured = new TextVar(config.variables, configuredPage, SWT.SINGLE | SWT.BORDER);
-    configured.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    configured.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
     if (config.editor != EditorKind.TEXT) {
       browse = new Button(configuredPage, SWT.PUSH);
       browse.setText(message("Browse"));
+      browse.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
       browse.addListener(SWT.Selection, event -> browse());
     } else {
       browse = null;
     }
     fieldPage = page(editors);
     field = new Combo(fieldPage, SWT.DROP_DOWN | SWT.BORDER);
-    field.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    field.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
     if (config.fieldProvider != null) {
       refresh = new Button(fieldPage, SWT.PUSH);
       refresh.setText(message("Refresh"));
+      refresh.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
       refresh.addListener(SWT.Selection, event -> refreshFields());
     } else {
       refresh = null;
@@ -111,9 +117,9 @@ public final class ValueOrFieldControl extends Composite {
       configured.setText(value.configuredValue());
       field.setText(value.fieldName());
       source.select(mode == SourceMode.FIELD ? 1 : 0);
+      lastValue = value;
       clearStatus();
       showMode();
-      lastValue = value;
     } finally {
       updating = false;
     }
@@ -132,7 +138,13 @@ public final class ValueOrFieldControl extends Composite {
     boolean wasUpdating = updating;
     updating = true;
     try {
-      String[] names = config.fieldProvider.getFieldNames();
+      String[] names;
+      try {
+        names = config.fieldProvider.getFieldNames();
+      } catch (Exception e) {
+        showError("FieldsError", e);
+        return;
+      }
       String[] suggestions =
           names == null
               ? new String[0]
@@ -142,8 +154,6 @@ public final class ValueOrFieldControl extends Composite {
       field.setText(current);
       fieldsLoaded = true;
       clearStatus();
-    } catch (Exception e) {
-      showError("FieldsError", e);
     } finally {
       updating = wasUpdating;
     }
@@ -177,24 +187,26 @@ public final class ValueOrFieldControl extends Composite {
   }
 
   private void browse() {
+    Optional<String> selection;
     try {
-      config
-          .browseStrategy
-          .browse(
+      selection =
+          config.browseStrategy.browse(
               getShell(),
               config.variables,
               configured.getText(),
               config.editor,
               config.extensions.clone(),
-              config.filterNames.clone())
-          .ifPresent(
-              value -> {
-                clearStatus();
-                configured.setText(value);
-              });
+              config.filterNames.clone());
     } catch (Exception e) {
       showError("BrowseError", e);
+      return;
     }
+    // Caller callbacks deliberately run outside the picker exception handler.
+    selection.ifPresent(
+        value -> {
+          clearStatus();
+          configured.setText(value);
+        });
   }
 
   private void changed() {
@@ -207,20 +219,29 @@ public final class ValueOrFieldControl extends Composite {
   }
 
   private void clearStatus() {
-    status.setText("");
-    status.setVisible(false);
-    ((GridData) status.getLayoutData()).exclude = true;
-    requestLayout();
+    setStatus("");
   }
 
   private void showError(String key, Exception error) {
-    status.setText(
+    setStatus(
         BaseMessages.getString(
             ValueOrFieldControl.class,
             "ValueOrField." + key,
             Objects.requireNonNullElse(error.getMessage(), error.getClass().getSimpleName())));
-    status.setVisible(true);
-    ((GridData) status.getLayoutData()).exclude = false;
+  }
+
+  private void setStatus(String message) {
+    if (message.equals(statusMessage)) return;
+    statusMessage = message;
+    if (config.onStatus != null) {
+      // The internal label stays excluded, so messages cannot change this row's height.
+      config.onStatus.accept(message);
+      return;
+    }
+    status.setText(message);
+    boolean visible = !message.isEmpty();
+    status.setVisible(visible);
+    ((GridData) status.getLayoutData()).exclude = !visible;
     requestLayout();
   }
 
@@ -247,6 +268,7 @@ public final class ValueOrFieldControl extends Composite {
     private InputFieldProvider fieldProvider;
     private BrowseStrategy browseStrategy = new HopBrowseStrategy();
     private Runnable onChange = () -> {};
+    private Consumer<String> onStatus;
 
     private Builder(Composite parent, IVariables variables) {
       this.parent = Objects.requireNonNull(parent, "parent");
@@ -292,17 +314,34 @@ public final class ValueOrFieldControl extends Composite {
       return this;
     }
 
+    /**
+     * Replaces the internal message row with a caller-owned status display. Invoked synchronously
+     * on the UI thread once during build with an empty string, then whenever the translated message
+     * changes. An empty string clears the status. Does not trigger onChange; callback exceptions
+     * propagate to the caller. Create the receiving controls before building this widget.
+     *
+     * @param callback external status handler (non-null)
+     * @return this builder
+     */
+    public Builder onStatus(Consumer<String> callback) {
+      this.onStatus = Objects.requireNonNull(callback, "callback");
+      return this;
+    }
+
     public ValueOrFieldControl build() {
       return new ValueOrFieldControl(this);
     }
 
     private Builder copy() {
-      return new Builder(parent, variables)
-          .editor(editor)
-          .fileFilters(extensions, filterNames)
-          .fieldProvider(fieldProvider)
-          .browseStrategy(browseStrategy)
-          .onChange(onChange);
+      Builder copy =
+          new Builder(parent, variables)
+              .editor(editor)
+              .fileFilters(extensions, filterNames)
+              .fieldProvider(fieldProvider)
+              .browseStrategy(browseStrategy)
+              .onChange(onChange);
+      copy.onStatus = onStatus;
+      return copy;
     }
   }
 }

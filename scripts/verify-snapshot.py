@@ -83,7 +83,7 @@ import org.apache.hop.core.variables.IVariables;
 import org.eclipse.swt.widgets.Composite;
 public class Consumer {
   public ValueOrFieldControl create(Composite parent, IVariables variables) {
-    ValueOrFieldControl control = ValueOrFieldControl.builder(parent, variables).editor(EditorKind.FILE_OPEN).build();
+    ValueOrFieldControl control = ValueOrFieldControl.builder(parent, variables).editor(EditorKind.FILE_OPEN).onStatus(message -> {}).build();
     control.setValue(new ValueOrField(SourceMode.FIELD, "${PROJECT_HOME}/a.tif", "path"));
     return control;
   }
