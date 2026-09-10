@@ -59,8 +59,8 @@ jobs:
           java-version: '21'
           cache: maven
           server-id: interlis-guru
-          server-username-env-var: MAVEN_USERNAME
-          server-password-env-var: MAVEN_PASSWORD
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
       - name: Validate publishing prerequisites
         shell: bash
         run: |
@@ -70,7 +70,14 @@ jobs:
           fi
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
+          from pathlib import Path
           version = ET.parse('pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
+          ns = {'s': 'http://maven.apache.org/SETTINGS/1.0.0'}
+          settings = ET.parse(Path.home() / '.m2/settings.xml')
+          server = settings.find("s:servers/s:server[s:id='interlis-guru']", ns)
+          assert server is not None, 'Maven deployment server is missing'
+          assert server.findtext('s:username', namespaces=ns) == '${env.MAVEN_USERNAME}', 'Wrong username environment reference'
+          assert server.findtext('s:password', namespaces=ns) == '${env.MAVEN_PASSWORD}', 'Wrong password environment reference'
           if not version.endswith('-SNAPSHOT'):
               raise SystemExit('Only SNAPSHOT versions may be published by this workflow')
           PY
