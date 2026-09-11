@@ -15,79 +15,44 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Verify with SWT display
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            xvfb-run -a mvn -B -ntp clean verify
-          else
-            mvn -B -ntp clean verify
-          fi
-      - name: Retain test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ matrix.os }}
-          path: '**/target/surefire-reports/'
+    uses: edigonzales/hop-plugin-ci/.github/workflows/maven-library-verify.yml@735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+    with:
+      java-versions: '["21", "25"]'
+      runner-os: '["ubuntu-24.04", "windows-2025", "macos-15"]'
+      canonical-runner-os: ubuntu-24.04
+      canonical-java-version: '21'
+      maven-working-directory: .
+      pom-file: pom.xml
+      maven-options: -U -B -ntp
+      maven-goals: clean package
+      compatibility-goals: clean test
+      artifact-descriptors: >-
+        [
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-parent","packaging":"pom","fileGlob":"pom.xml","pomFile":"pom.xml"},
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-core","packaging":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-core/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-javadoc.jar"}]},
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-ui","packaging":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-ui/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-javadoc.jar"}]}
+        ]
+      artifact-name-prefix: hop-plugin-commons
+      hop-version: 2.19.0
+      ci-ref: 735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
 
   publish:
-    name: Publish and verify snapshot
     needs: verify
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-24.04
-    env:
+    uses: edigonzales/hop-plugin-ci/.github/workflows/maven-library-publish.yml@735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+    with:
+      repository-kind: snapshot
+      verified-artifact-name: ${{ needs.verify.outputs.canonical-artifact-name }}
+      artifact-descriptors: >-
+        [
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-parent","packaging":"pom","fileGlob":"pom.xml","pomFile":"pom.xml"},
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-core","packaging":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-core/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-javadoc.jar"}]},
+          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-ui","packaging":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-ui/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-javadoc.jar"}]}
+        ]
+      pom-file: pom.xml
+      hop-version: 2.19.0
+      post-publish-commands: '["python3 scripts/verify-snapshot.py"]'
+      ci-ref: 735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+    secrets:
       MAVEN_USERNAME: ${{ secrets.INTERLIS_MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.INTERLIS_MAVEN_TOKEN }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          server-id: interlis-guru
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
-      - name: Validate publishing prerequisites
-        shell: bash
-        run: |
-          if [[ -z "$MAVEN_USERNAME" || -z "$MAVEN_PASSWORD" ]]; then
-            echo '::error::Missing INTERLIS_MAVEN_USERNAME or INTERLIS_MAVEN_TOKEN secret.'
-            exit 1
-          fi
-          python3 - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          version = ET.parse('pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
-          ns = {'s': 'http://maven.apache.org/SETTINGS/1.0.0'}
-          settings = ET.parse(Path.home() / '.m2/settings.xml')
-          server = settings.find("s:servers/s:server[s:id='interlis-guru']", ns)
-          assert server is not None, 'Maven deployment server is missing'
-          assert server.findtext('s:username', namespaces=ns) == '${env.MAVEN_USERNAME}', 'Wrong username environment reference'
-          assert server.findtext('s:password', namespaces=ns) == '${env.MAVEN_PASSWORD}', 'Wrong password environment reference'
-          if not version.endswith('-SNAPSHOT'):
-              raise SystemExit('Only SNAPSHOT versions may be published by this workflow')
-          PY
-      - name: Publish tested commit
-        run: mvn -B -ntp -DskipTests clean deploy
-      - name: Download and compile with an empty Maven cache
-        run: python3 scripts/verify-snapshot.py
-      - name: Record published versions
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: published-snapshot
-          path: target/published-snapshot.json

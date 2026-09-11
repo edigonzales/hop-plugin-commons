@@ -16,7 +16,7 @@ Bestehende Plugin-Metadaten und XML-Tags können unverändert bleiben. Hop Web u
 
 ## Build und Demo
 
-Voraussetzungen: JDK 21, Maven 3.6.3 oder neuer und ein grafischer Desktop.
+Voraussetzungen: JDK 21 oder neuer, Maven 3.6.3 oder neuer und ein grafischer Desktop.
 
 ```sh
 mvn -B -ntp clean verify
@@ -45,7 +45,7 @@ installierten Hop-Plugin und wird nicht als eigenes Artefakt veröffentlicht.
 ```xml
 <repositories>
   <repository>
-    <id>interlis-guru</id>
+    <id>sogeo-snapshots</id>
     <url>https://jars.interlis.guru/snapshots/</url>
     <releases><enabled>false</enabled></releases>
     <snapshots><enabled>true</enabled></snapshots>
@@ -221,28 +221,36 @@ Plugin-Classloaders; sie sind kein Austauschvertrag zwischen verschiedenen Plugi
 
 ## Snapshots veröffentlichen
 
-Der Workflow `.github/workflows/maven.yml` prüft alle drei Desktop-Plattformen.
+Der Workflow `.github/workflows/maven.yml` verwendet den zentralen Maven-Library-
+Vertrag aus `hop-plugin-ci`. Er prüft Ubuntu, Windows und macOS jeweils mit Java
+21 und 25. Ubuntu/Java 21 ist der kanonische Lauf und erzeugt das einzige
+veröffentlichbare Artefaktbundle; die übrigen fünf Läufe prüfen nur die
+Kompatibilität.
+
 Nach erfolgreicher Matrix veröffentlicht ein Push auf `main` den geprüften Commit.
 Zusätzlich ist ein manueller Aufruf auf `main` möglich. Pull Requests publizieren
-nicht; Releases sind in diesem Workflow nicht vorgesehen.
+nicht; GitHub-Releases sind für Commons nicht vorgesehen.
 
 Repository-Secrets:
 
 - `INTERLIS_MAVEN_USERNAME`
 - `INTERLIS_MAVEN_TOKEN`
 
-Die Server-ID lautet `interlis-guru`, das Deployment-Ziel
-`https://jars.interlis.guru/snapshots/`. Maven publiziert den Parent-POM und beide
-Module inklusive Sources/Javadoc mit `deployAtEnd`. Veröffentlichungen für `main`
-werden serialisiert. Ein fehlgeschlagenes Deployment wird als Fehler gemeldet;
-`deployAtEnd` ist keine serverseitig atomare Transaktion.
+Die Server-ID lautet `sogeo-snapshots`, das Deployment-Ziel
+`https://jars.interlis.guru/snapshots/`. Das kanonische Bundle enthält den Parent-
+POM und beide Module inklusive Sources/Javadoc. Der Publish-Workflow lädt dieses
+Bundle herunter und veröffentlicht exakt diese Dateien mit `deploy-file`; es gibt
+keinen Neubuild im Publish-Schritt. Veröffentlichungen für `main` werden
+serialisiert.
 
-Nach dem Upload prüft `scripts/verify-snapshot.py` die zeitgestempelten Metadaten,
-POMs, JARs und SHA-1-Transportprüfsummen. Es kompiliert ein separates Beispiel mit
-leeren Maven-Settings und einem frischen temporären Cache. Ergebnis:
+Nach dem Upload prüft `scripts/verify-snapshot.py` die veröffentlichten POMs und
+JARs über normale Maven-SNAPSHOT-Auflösung mit `-U`. Das Skript kompiliert ein
+separates Beispiel mit leeren Maven-Settings und einem frischen temporären Cache;
+Maven wählt dabei selbst den aktuellen Snapshot aus den Repository-Metadaten.
+Ergebnis:
 `target/published-snapshot.json`, zusätzlich als Workflow-Artefakt archiviert.
 
-Für einen lokalen, ausdrücklich gewünschten Deploy die Credentials ausserhalb des
-Repositories in Maven-Settings unter Server-ID `interlis-guru` konfigurieren und
-`mvn -B -ntp clean deploy` ausführen (Linux ohne Desktop: mit `xvfb-run -a`).
-Credentials nie in POM, Git oder Kommandozeilenargumente schreiben.
+Für einen lokalen Build genügt `mvn -U -B -ntp clean verify` (Linux ohne Desktop:
+`xvfb-run -a mvn -U -B -ntp clean verify`).
+Veröffentlichungen erfolgen über den geschützten Workflow. Credentials nie in POM,
+Git oder Kommandozeilenargumente schreiben.

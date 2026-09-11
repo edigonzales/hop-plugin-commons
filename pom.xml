@@ -42,7 +42,7 @@
   </dependencyManagement>
   <distributionManagement>
     <snapshotRepository>
-      <id>interlis-guru</id>
+      <id>sogeo-snapshots</id>
       <url>https://jars.interlis.guru/snapshots/</url>
     </snapshotRepository>
   </distributionManagement>
