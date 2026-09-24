@@ -164,7 +164,8 @@ public final class ValueOrFieldControl extends Composite {
   @Override
   public boolean setFocus() {
     checkWidget();
-    return mode == SourceMode.FIELD ? field.setFocus() : configured.setFocus();
+    Control activeEditor = mode == SourceMode.FIELD ? field : configured;
+    return !activeEditor.isDisposed() && activeEditor.setFocus();
   }
 
   @Override
