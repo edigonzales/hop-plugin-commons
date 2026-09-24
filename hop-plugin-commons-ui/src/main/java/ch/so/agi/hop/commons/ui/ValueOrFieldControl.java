@@ -40,13 +40,15 @@ public final class ValueOrFieldControl extends Composite {
   private SourceMode mode = SourceMode.CONFIGURED;
   private boolean updating;
   private boolean fieldsLoaded;
+  private boolean controlEnabled = true;
   private String statusMessage;
   private ValueOrField lastValue = new ValueOrField(SourceMode.CONFIGURED, "", "");
 
   private ValueOrFieldControl(Builder builder) {
     super(builder.parent, SWT.NONE);
     config = builder.copy();
-    GridLayout layout = new GridLayout(2, false);
+    int columns = config.editor == EditorKind.TEXT ? 2 : 3;
+    GridLayout layout = new GridLayout(columns, false);
     layout.marginWidth = 0;
     layout.marginHeight = 0;
     setLayout(layout);
@@ -60,9 +62,9 @@ public final class ValueOrFieldControl extends Composite {
     editors.setLayout(stack);
     configuredPage = page(editors);
     configured = new TextVar(config.variables, configuredPage, SWT.SINGLE | SWT.BORDER);
-    configured.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
+    configured.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true, 2, 1));
     if (config.editor != EditorKind.TEXT) {
-      browse = new Button(configuredPage, SWT.PUSH);
+      browse = new Button(this, SWT.PUSH);
       browse.setText(message("Browse"));
       browse.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
       browse.addListener(SWT.Selection, event -> browse());
@@ -81,7 +83,7 @@ public final class ValueOrFieldControl extends Composite {
       refresh = null;
     }
     status = new Label(this, SWT.WRAP);
-    GridData statusData = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
+    GridData statusData = new GridData(SWT.FILL, SWT.CENTER, true, false, columns, 1);
     statusData.widthHint = 320;
     statusData.exclude = true;
     status.setLayoutData(statusData);
@@ -169,11 +171,9 @@ public final class ValueOrFieldControl extends Composite {
   public void setEnabled(boolean enabled) {
     super.setEnabled(enabled);
     if (source == null) return;
+    controlEnabled = enabled;
     source.setEnabled(enabled);
-    configured.setEnabled(enabled);
-    field.setEnabled(enabled);
-    if (browse != null) browse.setEnabled(enabled);
-    if (refresh != null) refresh.setEnabled(enabled);
+    updateEnabledControls();
   }
 
   private void showMode() {
@@ -181,9 +181,19 @@ public final class ValueOrFieldControl extends Composite {
     stack.topControl = fromField ? fieldPage : configuredPage;
     editors.setTabList(new Control[] {stack.topControl});
     editors.layout();
+    updateEnabledControls();
     if (fromField && !fieldsLoaded) refreshFields();
     if (!fromField) clearStatus();
     layout(true, true);
+  }
+
+  private void updateEnabledControls() {
+    boolean configuredEnabled = controlEnabled && mode == SourceMode.CONFIGURED;
+    boolean fieldEnabled = controlEnabled && mode == SourceMode.FIELD;
+    configured.setEnabled(configuredEnabled);
+    field.setEnabled(fieldEnabled);
+    if (browse != null) browse.setEnabled(configuredEnabled);
+    if (refresh != null) refresh.setEnabled(fieldEnabled);
   }
 
   private void browse() {

@@ -135,6 +135,9 @@ das oben gezeigte Muster ist für stabil ausgerichtete externe Labels vorgesehen
 Für ein Verzeichnis genügt
 `.editor(EditorKind.DIRECTORY)`, für eine Ausgabedatei `FILE_SAVE`. Ohne Editorangabe
 wird `TEXT` verwendet. Ohne Feldanbieter sind Feldnamen weiterhin manuell eingebbar.
+Bei datei- und verzeichnisfähigen Editoren bleibt `Browse` in beiden Modi sichtbar:
+Im Modus `Wert / Variable` ist die Schaltfläche aktiv, im Modus `Eingabefeld`
+ausgegraut. Die Feldwahl und `Aktualisieren` bleiben im Feldmodus bedienbar.
 
 Alle Widget-Methoden und Callbacks laufen auf dem SWT-UI-Thread. Der Feldanbieter
 wird beim ersten Wechsel in den Feldmodus (auch durch `setValue`) geladen. Nach

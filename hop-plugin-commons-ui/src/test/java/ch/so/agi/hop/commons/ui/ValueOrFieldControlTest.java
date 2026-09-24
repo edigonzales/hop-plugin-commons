@@ -162,6 +162,54 @@ class ValueOrFieldControlTest {
   }
 
   @Test
+  void browseVisibilityAndEnabledStateFollowModeAndGlobalEnabledState() {
+    shell.setLayout(new GridLayout());
+    shell.open();
+    for (EditorKind kind :
+        new EditorKind[] {EditorKind.FILE_OPEN, EditorKind.FILE_SAVE, EditorKind.DIRECTORY}) {
+      ValueOrFieldControl control =
+          builder().editor(kind).fieldProvider(() -> new String[] {"path"}).build();
+      control.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+      shell.layout(true, true);
+      pump();
+
+      Button browse = button(control, true);
+      Button refresh = button(control, false);
+      Combo inputField = field(control);
+      assertTrue(browse.isVisible());
+      assertTrue(browse.isEnabled());
+      assertFalse(refresh.isVisible());
+
+      switchMode(control, 1);
+      pump();
+      assertTrue(browse.isVisible());
+      assertFalse(browse.isEnabled());
+      assertTrue(inputField.isVisible());
+      assertTrue(inputField.isEnabled());
+      assertTrue(refresh.isVisible());
+      assertTrue(refresh.isEnabled());
+
+      control.setEnabled(false);
+      assertFalse(browse.isEnabled());
+      assertFalse(inputField.isEnabled());
+      assertFalse(refresh.isEnabled());
+      switchMode(control, 0);
+      assertFalse(browse.isEnabled());
+      assertFalse(inputField.isEnabled());
+      assertFalse(refresh.isEnabled());
+
+      control.setEnabled(true);
+      assertTrue(browse.isEnabled());
+      assertFalse(refresh.isEnabled());
+      switchMode(control, 1);
+      assertFalse(browse.isEnabled());
+      assertTrue(inputField.isEnabled());
+      assertTrue(refresh.isEnabled());
+      control.dispose();
+    }
+  }
+
+  @Test
   void browseFailureKeepsStateAndShowsError() {
     ValueOrFieldControl control =
         builder()
@@ -474,6 +522,19 @@ class ValueOrFieldControlTest {
 
   private ValueOrFieldControl.Builder builder() {
     return ValueOrFieldControl.builder(shell, new Variables());
+  }
+
+  private static Button button(ValueOrFieldControl control, boolean browse) {
+    return all(control, Button.class).stream()
+        .filter(
+            candidate ->
+                browse
+                    ? candidate.getText().startsWith("Browse")
+                        || candidate.getText().startsWith("Durchsuchen")
+                    : candidate.getText().equals("Refresh")
+                        || candidate.getText().equals("Aktualisieren"))
+        .findFirst()
+        .orElseThrow();
   }
 
   static void switchMode(ValueOrFieldControl c, int mode) {
