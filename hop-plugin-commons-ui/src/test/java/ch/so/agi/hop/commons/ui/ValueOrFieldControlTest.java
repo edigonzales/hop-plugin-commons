@@ -266,6 +266,34 @@ class ValueOrFieldControlTest {
   }
 
   @Test
+  void longValuesShrinkWithoutHidingBrowseOrRefresh() {
+    var control =
+        builder()
+            .editor(EditorKind.FILE_SAVE)
+            .fieldProvider(() -> new String[] {"field_".repeat(100)})
+            .build();
+    control.setValue(
+        new ValueOrField(SourceMode.CONFIGURED, "/long/path".repeat(100), "field_".repeat(100)));
+    shell.open();
+    for (int width : new int[] {760, 520, 900}) {
+      shell.setSize(width, 180);
+      for (int mode : new int[] {0, 1}) {
+        switchMode(control, mode);
+        shell.layout(true, true);
+        for (Button button : all(control, Button.class)) {
+          if (!button.isVisible()) continue;
+          var point = display.map(button, control, 0, 0);
+          assertTrue(point.x >= 0);
+          assertTrue(
+              point.x + button.getSize().x <= control.getClientArea().width,
+              "Button is clipped: " + button.getText());
+        }
+      }
+    }
+    assertEquals("/long/path".repeat(100), control.getValue().configuredValue());
+  }
+
+  @Test
   void defaultsAllowManualFieldsAndBuildersAreIndependent() {
     ValueOrFieldControl.Builder builder = builder();
     ValueOrFieldControl first = builder.build();

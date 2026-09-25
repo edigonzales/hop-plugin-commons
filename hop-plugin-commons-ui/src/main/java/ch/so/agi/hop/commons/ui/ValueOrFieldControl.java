@@ -57,12 +57,17 @@ public final class ValueOrFieldControl extends Composite {
     source.select(0);
     source.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
     editors = new Composite(this, SWT.NONE);
-    editors.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    GridData editorData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+    editorData.widthHint = 0;
+    editorData.minimumWidth = 0;
+    editors.setLayoutData(editorData);
     stack = new StackLayout();
     editors.setLayout(stack);
     configuredPage = page(editors);
     configured = new TextVar(config.variables, configuredPage, SWT.SINGLE | SWT.BORDER);
-    configured.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true, 2, 1));
+    GridData textData = new GridData(SWT.FILL, SWT.CENTER, true, true, 2, 1);
+    textData.widthHint = 0;
+    configured.setLayoutData(textData);
     if (config.editor != EditorKind.TEXT) {
       browse = new Button(this, SWT.PUSH);
       browse.setText(message("Browse"));
@@ -73,7 +78,9 @@ public final class ValueOrFieldControl extends Composite {
     }
     fieldPage = page(editors);
     field = new Combo(fieldPage, SWT.DROP_DOWN | SWT.BORDER);
-    field.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
+    GridData fieldData = new GridData(SWT.FILL, SWT.CENTER, true, true);
+    fieldData.widthHint = 0;
+    field.setLayoutData(fieldData);
     if (config.fieldProvider != null) {
       refresh = new Button(fieldPage, SWT.PUSH);
       refresh.setText(message("Refresh"));
