@@ -250,8 +250,8 @@ Nach dem Upload prüft `scripts/verify-snapshot.py` die veröffentlichten POMs u
 JARs über normale Maven-SNAPSHOT-Auflösung mit `-U`. Das Skript kompiliert ein
 separates Beispiel mit leeren Maven-Settings und einem frischen temporären Cache;
 Maven wählt dabei selbst den aktuellen Snapshot aus den Repository-Metadaten.
-Ergebnis:
-`target/published-snapshot.json`, zusätzlich als Workflow-Artefakt archiviert.
+Das Skript schreibt das Ergebnis nach `target/published-snapshot.json` und in
+das Job-Log.
 
 Für einen lokalen Build genügt `mvn -U -B -ntp clean verify` (Linux ohne Desktop:
 `xvfb-run -a mvn -U -B -ntp clean verify`).
