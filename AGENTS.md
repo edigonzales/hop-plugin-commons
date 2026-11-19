@@ -4,8 +4,7 @@
 
 Before changing pipelines or test setup, read the
 [shared CI contract](https://github.com/edigonzales/hop-plugin-ci/blob/main/docs/ci-contract.md).
-The documentation follows `main`; use the interfaces at this repo's actual
-workflow/helper revisions and preserve existing pins and `ci-ref` values.
+Use the CI interfaces at the shared workflow pin.
 
 Run the commands below from this repository root in Bash, using Python 3, Maven
 and JDK 21 (`JAVA_HOME` and `PATH` pointing to that JDK). Compatibility jobs also
@@ -28,7 +27,7 @@ is Ubuntu 24.04/JDK 21; compatibility includes Windows 2025 and macOS 15.
 mvn -s "$MAVEN_SETTINGS" -U -B -ntp clean package
 ```
 
-For compatibility use `clean test` instead. The canonical artifact descriptors
+For compatibility use `clean test` instead. The canonical artifact inputs
 include the parent POM, core/UI JARs and POMs, and sources/javadoc classifiers.
 This is a Maven library bundle, not an installable Hop ZIP; there is no installed
 Hop E2E stage in this workflow.

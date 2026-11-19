@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    uses: edigonzales/hop-plugin-ci/.github/workflows/maven-library-verify.yml@735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+    uses: edigonzales/hop-plugin-ci/.github/workflows/verify.yml@f0a1eec368cb8c5d2592086b26393a6fc3916ad1
     with:
       java-versions: '["21", "25"]'
       runner-os: '["ubuntu-24.04", "windows-2025", "macos-15"]'
@@ -26,33 +26,30 @@ jobs:
       maven-options: -U -B -ntp
       maven-goals: clean package
       compatibility-goals: clean test
-      artifact-descriptors: >-
-        [
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-parent","packaging":"pom","fileGlob":"pom.xml","pomFile":"pom.xml"},
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-core","packaging":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-core/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-javadoc.jar"}]},
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-ui","packaging":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-ui/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-javadoc.jar"}]}
-        ]
       artifact-name-prefix: hop-plugin-commons
-      hop-version: 2.19.0
-      ci-ref: 735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+      artifacts: >-
+        [{"pom":"pom.xml"},
+         {"pom":"hop-plugin-commons-core/pom.xml","file":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT.jar","classifiers":["sources","javadoc"]},
+         {"pom":"hop-plugin-commons-ui/pom.xml","file":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT.jar","classifiers":["sources","javadoc"]}]
 
   publish:
     needs: verify
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    uses: edigonzales/hop-plugin-ci/.github/workflows/maven-library-publish.yml@735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
+    uses: edigonzales/hop-plugin-ci/.github/workflows/publish.yml@f0a1eec368cb8c5d2592086b26393a6fc3916ad1
     with:
       repository-kind: snapshot
       verified-artifact-name: ${{ needs.verify.outputs.canonical-artifact-name }}
-      artifact-descriptors: >-
-        [
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-parent","packaging":"pom","fileGlob":"pom.xml","pomFile":"pom.xml"},
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-core","packaging":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-core/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-core/target/hop-plugin-commons-core-*-SNAPSHOT-javadoc.jar"}]},
-          {"groupId":"ch.so.agi","artifactId":"hop-plugin-commons-ui","packaging":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT.jar","pomFile":"hop-plugin-commons-ui/pom.xml","classifiers":[{"classifier":"sources","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-sources.jar"},{"classifier":"javadoc","type":"jar","fileGlob":"hop-plugin-commons-ui/target/hop-plugin-commons-ui-*-SNAPSHOT-javadoc.jar"}]}
-        ]
-      pom-file: pom.xml
-      hop-version: 2.19.0
-      post-publish-commands: '["python3 scripts/verify-snapshot.py"]'
-      ci-ref: 735f4b88bc4bcd8a17eeb5bfd70b784bab2628a8
     secrets:
       MAVEN_USERNAME: ${{ secrets.INTERLIS_MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.INTERLIS_MAVEN_TOKEN }}
+
+  verify-published:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python3 scripts/verify-snapshot.py
